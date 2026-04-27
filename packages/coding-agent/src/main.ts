@@ -688,14 +688,18 @@ export async function main(args: string[], options?: MainOptions) {
 			console.log(chalk.dim(`Model scope: ${modelList} ${chalk.gray("(Ctrl+P to cycle)")}`));
 		}
 
-		const interactiveMode = new InteractiveMode(runtime, {
+		const interactiveOptions = {
 			migratedProviders,
 			modelFallbackMessage,
 			initialMessage,
 			initialImages,
 			initialMessages: parsed.messages,
 			verbose: parsed.verbose,
-		});
+		};
+		const useSumoTui = isTruthyEnvFlag(process.env.SUMO_TUI) || parsed.unknownFlags.has("sumo-tui");
+		const interactiveMode = useSumoTui
+			? await loadSumoInteractiveMode(runtime, interactiveOptions)
+			: new InteractiveMode(runtime, interactiveOptions);
 		if (startupBenchmark) {
 			await interactiveMode.init();
 			time("interactiveMode.init");
@@ -728,4 +732,12 @@ export async function main(args: string[], options?: MainOptions) {
 		}
 		return;
 	}
+}
+
+async function loadSumoInteractiveMode(
+	...args: ConstructorParameters<typeof InteractiveMode>
+): Promise<Pick<InteractiveMode, "init" | "run" | "stop">> {
+	const specifier = process.env.SUMO_TUI_MODULE ?? "@dhruvkelawala/sumocode/sumo-interactive-mode";
+	const { SumoInteractiveMode } = await import(specifier);
+	return new SumoInteractiveMode(...args) as Pick<InteractiveMode, "init" | "run" | "stop">;
 }
